@@ -4,20 +4,24 @@ HistogramLUTWidget test:
 Tests the creation of a HistogramLUTWidget.
 """
 
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
+
+import itertools
 import numpy as np
+
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtWidgets
+
 
 def testHistogramLUTWidget():
     pg.mkQApp()
-    
-    win = QtGui.QMainWindow()
+
+    win = QtWidgets.QMainWindow()
     win.show()
 
-    cw = QtGui.QWidget()
+    cw = QtWidgets.QWidget()
     win.setCentralWidget(cw)
 
-    l = QtGui.QGridLayout()
+    l = QtWidgets.QGridLayout()
     cw.setLayout(l)
     l.setSpacing(0)
 
@@ -31,14 +35,13 @@ def testHistogramLUTWidget():
     l.addWidget(w, 0, 1)
 
     data = pg.gaussianFilter(np.random.normal(size=(256, 256, 3)), (20, 20, 0))
-    for i in range(32):
-        for j in range(32):
-            data[i*8, j*8] += .1
+    for i, j in itertools.product(range(32), range(32)):
+        data[i*8, j*8] += .1
     img = pg.ImageItem(data)
     vb.addItem(img)
     vb.autoRange()
 
     w.setImageItem(img)
-    
-    QtGui.QApplication.processEvents()
+
+    QtWidgets.QApplication.processEvents()
     win.close()

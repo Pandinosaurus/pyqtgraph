@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 Point.py -  Extension of QPointF which adds a few missing methods.
 Copyright 2010  Luke Campagnola
 Distributed under MIT/X11 license. See license.txt for more information.
 """
 
+from math import atan2, degrees, hypot
+
 from .Qt import QtCore
-from math import atan2, hypot, degrees
 
 
 class Point(QtCore.QPointF):
@@ -134,6 +134,7 @@ class Point(QtCore.QPointF):
         return Point.dotProduct(self, a)
     
     def cross(self, a):
+        """Returns the cross product of a and this Point"""
         if not isinstance(a, QtCore.QPointF):
             a = Point(a)
         return self.x() * a.y() - self.y() * a.x()

@@ -1,23 +1,27 @@
-# -*- coding: utf-8 -*-
 import numpy as np
+
 import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
-from pyqtgraph.exporters import ImageExporter
 import pyqtgraph.functions as fn
+from pyqtgraph.exporters import ImageExporter
+from pyqtgraph.Qt import QtGui
 
 app = pg.mkQApp()
 
 
 def test_ImageExporter_filename_dialog():
-    """Tests ImageExporter code path that opens a file dialog. Regression test
-    for pull request 1133."""
-    p = pg.plot()
+    """
+    Tests ImageExporter code path that opens a file dialog.
+    Regression test for pull request 1133.
+    """
+    p = pg.PlotWidget()
+    p.show()
     exp = ImageExporter(p.getPlotItem())
     exp.export()
 
 
 def test_ImageExporter_toBytes():
-    p = pg.plot()
+    p = pg.PlotWidget()
+    p.show()
     p.hideAxis('bottom')
     p.hideAxis('left')
     exp = ImageExporter(p.getPlotItem())

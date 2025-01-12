@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
+import numpy as np
+
 from .. import functions as fn
+from .. import getConfigOption
+from ..Qt import QtCore, QtGui
 from .GraphicsObject import GraphicsObject
 from .ScatterPlotItem import ScatterPlotItem
-from ..Qt import QtGui, QtCore
-import numpy as np
-from .. import getConfigOption
 
 __all__ = ['GraphItem']
 
@@ -111,7 +111,7 @@ class GraphItem(GraphicsObject):
                 lastPen = None
                 for i in range(pts.shape[0]):
                     pen = self.pen[i]
-                    if np.any(pen != lastPen):
+                    if lastPen is None or np.any(pen != lastPen):
                         lastPen = pen
                         if pen.dtype.fields is None:
                             p.setPen(fn.mkPen(color=(pen[0], pen[1], pen[2], pen[3]), width=1))                            
@@ -129,7 +129,7 @@ class GraphItem(GraphicsObject):
             p.end()
 
     def paint(self, p, *args):
-        if self.picture == None:
+        if self.picture is None:
             self.generatePicture()
         if getConfigOption('antialias') is True:
             p.setRenderHint(p.RenderHint.Antialiasing)

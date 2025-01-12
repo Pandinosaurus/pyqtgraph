@@ -1,11 +1,12 @@
 import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtTest
-from pyqtgraph.graphicsItems.NonUniformImage import NonUniformImage
-from tests.image_testing import assertImageApproved
-from pyqtgraph.colormap import ColorMap
-import pyqtgraph.functions as fn
 import pytest
+
+import pyqtgraph as pg
+import pyqtgraph.functions as fn
+from pyqtgraph.colormap import ColorMap
+from pyqtgraph.graphicsItems.NonUniformImage import NonUniformImage
+from pyqtgraph.Qt import QtTest
+from tests.image_testing import assertImageApproved
 
 app = pg.mkQApp()
 
@@ -60,15 +61,11 @@ def test_NonUniformImage_lut():
     Z = X * Y
 
     image = NonUniformImage(x, y, Z, border=fn.mkPen('g'))
+
+    cmap = ColorMap(None, [0.0, 1.0])
+    image.setLookupTable(cmap.getLookupTable(nPts=256))
+
     viewbox.addItem(image)
-
-    lut = pg.HistogramLUTItem()
-    window.addItem(lut)
-
-    image.setLookupTable(lut, autoLevel=True)
-
-    h = image.getHistogram()
-    lut.plot.setData(*h)
 
     QtTest.QTest.qWaitForWindowExposed(window)
     QtTest.QTest.qWait(100)
@@ -89,7 +86,7 @@ def test_NonUniformImage_colormap():
     X, Y = np.meshgrid(x, y, indexing='ij')
     Z = X * Y
 
-    Z[:, 0] = [np.NINF, np.NAN, np.PINF]
+    Z[:, 0] = [-np.inf, np.nan, np.inf]
 
     image = NonUniformImage(x, y, Z, border=fn.mkPen('g'))
 

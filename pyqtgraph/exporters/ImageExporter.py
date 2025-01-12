@@ -1,9 +1,11 @@
-from .Exporter import Exporter
+import sys
+
+import numpy as np
+
+from .. import functions as fn
 from ..parametertree import Parameter
 from ..Qt import QtCore, QtGui, QtWidgets
-from .. import functions as fn
-import numpy as np
-import sys
+from .Exporter import Exporter
 
 translate = QtCore.QCoreApplication.translate
 __all__ = ['ImageExporter']
@@ -15,7 +17,7 @@ class ImageExporter(Exporter):
     def __init__(self, item):
         Exporter.__init__(self, item)
         tr = self.getTargetRect()
-        if isinstance(item, QtGui.QGraphicsItem):
+        if isinstance(item, QtWidgets.QGraphicsItem):
             scene = item.scene()
         else:
             scene = item
@@ -24,7 +26,7 @@ class ImageExporter(Exporter):
         if bgbrush.style() == QtCore.Qt.BrushStyle.NoBrush:
             bg.setAlpha(0)
 
-        self.params = Parameter(name='params', type='group', children=[
+        self.params = Parameter.create(name='params', type='group', children=[
             {'name': 'width', 'title': translate("Exporter", 'width'), 'type': 'int', 'value': int(tr.width()),
              'limits': (0, None)},
             {'name': 'height', 'title': translate("Exporter", 'height'), 'type': 'int', 'value': int(tr.height()),

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 debug.py - Functions to aid in debugging 
 Copyright 2010  Luke Campagnola
@@ -8,17 +7,25 @@ Distributed under MIT/X11 license. See license.txt for more information.
 
 from __future__ import print_function
 
-import sys, traceback, time, gc, re, types, weakref, inspect, os, cProfile, threading
 import contextlib
+import cProfile
+import gc
+import inspect
+import os
+import re
+import sys
+import threading
+import time
+import traceback
+import types
 import warnings
+import weakref
 from time import perf_counter
+
 from numpy import ndarray
-from .Qt import QtCore, QT_LIB
+
+from .Qt import QT_LIB, QtCore
 from .util import cprint
-if sys.version.startswith("3.8") and QT_LIB == "PySide2":
-    from .Qt import PySide2
-    if tuple(map(int, PySide2.__version__.split("."))) < (5, 14):
-        warnings.warn("Due to PYSIDE-1140, ThreadChase and ThreadColor won't work")
 from .util.mutex import Mutex
 
 
@@ -632,10 +639,13 @@ def get_all_objects():
     gcl = gc.get_objects()
     olist = {}
     _getr(gcl, olist)
-    
-    del olist[id(olist)]
-    del olist[id(gcl)]
-    del olist[id(sys._getframe())]
+
+    # Remove internally created objects
+    for key in (id(olist), id(gcl), id(sys._getframe())):
+        try:
+            del olist[key]
+        except KeyError:
+            pass
     return olist
 
 
@@ -801,8 +811,14 @@ class ObjTracker(object):
         gc.collect()
         objs = get_all_objects()
         frame = sys._getframe()
-        del objs[id(frame)]  ## ignore the current frame 
-        del objs[id(frame.f_code)]
+        try:
+            del objs[id(frame)]  ## ignore the current frame 
+        except KeyError:
+            pass
+        try:
+            del objs[id(frame.f_code)]
+        except KeyError:
+            pass
         
         ignoreTypes = [int]
         refs = {}
@@ -877,7 +893,6 @@ class ObjTracker(object):
         
     def findTypes(self, refs, regex):
         allObjs = get_all_objects()
-        ids = {}
         objs = []
         r = re.compile(regex)
         for k in refs:
@@ -1041,10 +1056,8 @@ def walkQObjectTree(obj, counts=None, verbose=False, depth=0):
     
     if verbose:
         print("  "*depth + typeStr(obj))
-    report = False
     if counts is None:
         counts = {}
-        report = True
     typ = str(type(obj))
     try:
         counts[typ] += 1
@@ -1179,19 +1192,7 @@ class ThreadTrace(object):
                     if id == threading.current_thread().ident:
                         continue
 
-                    # try to determine a thread name
-                    try:
-                        name = threading._active.get(id, None)
-                    except:
-                        name = None
-                    if name is None:
-                        try:
-                            # QThread._names must be manually set by thread creators.
-                            name = QtCore.QThread._names.get(id)
-                        except:
-                            name = None
-                    if name is None:
-                        name = "???"
+                    name = threadName()
 
                     printFile.write("<< thread %d \"%s\" >>\n" % (id, name))
                     tb = str(''.join(traceback.format_stack(frame)))
@@ -1202,6 +1203,46 @@ class ThreadTrace(object):
 
                 iter += 1
                 time.sleep(self.interval)
+
+
+def threadName(threadId=None):
+    """Return a string name for a thread id.
+
+    If *threadId* is None, then the current thread's id is used.
+
+    This attempts to look up thread names either from `threading._active`, or from
+    QThread._names. However, note that the latter does not exist by default; rather
+    you must manually add id:name pairs to a dictionary there::
+
+        # for python threads:
+        t1 = threading.Thread(name="mythread")
+
+        # for Qt threads:
+        class Thread(Qt.QThread):
+            def __init__(self, name):
+                self._threadname = name
+                if not hasattr(Qt.QThread, '_names'):
+                    Qt.QThread._names = {}
+                Qt.QThread.__init__(self, *args, **kwds)
+            def run(self):
+                Qt.QThread._names[threading.current_thread().ident] = self._threadname
+    """
+    if threadId is None:
+        threadId = threading.current_thread().ident
+    
+    try:
+        name = threading._active.get(threadId, None)
+    except Exception:
+        name = None
+    if name is None:
+        try:
+            # QThread._names must be manually set by thread creators.
+            name = QtCore.QThread._names.get(threadId)
+        except Exception:
+            name = None
+    if name is None:
+        name = "???"
+    return name
 
 
 class ThreadColor(object):
@@ -1245,6 +1286,7 @@ def enableFaulthandler():
     """
     try:
         import faulthandler
+
         # necessary to disable first or else new threads may not be handled.
         faulthandler.disable()
         faulthandler.enable(all_threads=True)

@@ -1,21 +1,21 @@
-# -*- coding: utf-8 -*-
-from ..Node import Node
-from ...Qt import QtGui, QtCore, QtWidgets
-import numpy as np
-import sys
-from .common import *
-from ...widgets.TreeWidget import TreeWidget
-from ...graphicsItems.LinearRegionItem import LinearRegionItem
 
+import numpy as np
+
+from ...graphicsItems.LinearRegionItem import LinearRegionItem
+from ...Qt import QtCore, QtWidgets
+from ...widgets.TreeWidget import TreeWidget
+from ..Node import Node
 from . import functions
+from .common import CtrlNode
+
 
 class ColumnSelectNode(Node):
-    """Select named columns from a record array or MetaArray."""
+    """Select named columns from a record array."""
     nodeName = "ColumnSelect"
     def __init__(self, name):
         Node.__init__(self, name, terminals={'In': {'io': 'in'}})
         self.columns = set()
-        self.columnList = QtGui.QListWidget()
+        self.columnList = QtWidgets.QListWidget()
         self.axis = 0
         self.columnList.itemChanged.connect(self.itemChanged)
         
@@ -24,31 +24,20 @@ class ColumnSelectNode(Node):
             self.updateList(In)
                 
         out = {}
-        if hasattr(In, 'implements') and In.implements('MetaArray'):
-            for c in self.columns:
-                out[c] = In[self.axis:c]
-        elif isinstance(In, np.ndarray) and In.dtype.fields is not None:
+        if isinstance(In, np.ndarray) and In.dtype.fields is not None:
             for c in self.columns:
                 out[c] = In[c]
         else:
             self.In.setValueAcceptable(False)
-            raise Exception("Input must be MetaArray or ndarray with named fields")
-            
+            raise Exception("Input must be ndarray with named fields")
+
         return out
         
     def ctrlWidget(self):
         return self.columnList
 
     def updateList(self, data):
-        if hasattr(data, 'implements') and data.implements('MetaArray'):
-            cols = data.listColumns()
-            for ax in cols:  ## find first axis with columns
-                if len(cols[ax]) > 0:
-                    self.axis = ax
-                    cols = set(cols[ax])
-                    break
-        else:
-            cols = list(data.dtype.fields.keys())
+        cols = list(data.dtype.fields.keys())
                 
         rem = set()
         for c in self.columns:
@@ -60,7 +49,7 @@ class ColumnSelectNode(Node):
         self.columnList.blockSignals(True)
         self.columnList.clear()
         for c in cols:
-            item = QtGui.QListWidgetItem(c)
+            item = QtWidgets.QListWidgetItem(c)
             item.setFlags(QtCore.Qt.ItemFlag.ItemIsEnabled|QtCore.Qt.ItemFlag.ItemIsUserCheckable)
             if c in self.columns:
                 item.setCheckState(QtCore.Qt.CheckState.Checked)
@@ -154,8 +143,6 @@ class RegionSelectNode(CtrlNode):
         if self['selected'].isConnected():
             if data is None:
                 sliced = None
-            elif (hasattr(data, 'implements') and data.implements('MetaArray')):
-                sliced = data[0:s['start']:s['stop']]
             else:
                 mask = (data['time'] >= s['start']) * (data['time'] < s['stop'])
                 sliced = data[mask]
@@ -199,8 +186,8 @@ class EvalNode(Node):
             },
             allowAddInput=True, allowAddOutput=True)
         
-        self.ui = QtGui.QWidget()
-        self.layout = QtGui.QGridLayout()
+        self.ui = QtWidgets.QWidget()
+        self.layout = QtWidgets.QGridLayout()
         self.text = TextEdit(self.update)
         self.text.setTabStopWidth(30)
         self.text.setPlainText("# Access inputs as args['input_name']\nreturn {'output': None} ## one key per output terminal")
@@ -272,13 +259,13 @@ class ColumnJoinNode(Node):
         
         #self.items = []
         
-        self.ui = QtGui.QWidget()
-        self.layout = QtGui.QGridLayout()
+        self.ui = QtWidgets.QWidget()
+        self.layout = QtWidgets.QGridLayout()
         self.ui.setLayout(self.layout)
         
         self.tree = TreeWidget()
-        self.addInBtn = QtGui.QPushButton('+ Input')
-        self.remInBtn = QtGui.QPushButton('- Input')
+        self.addInBtn = QtWidgets.QPushButton('+ Input')
+        self.remInBtn = QtWidgets.QPushButton('- Input')
         
         self.layout.addWidget(self.tree, 0, 0, 1, 2)
         self.layout.addWidget(self.addInBtn, 1, 0)
@@ -295,7 +282,7 @@ class ColumnJoinNode(Node):
         #print "ColumnJoinNode.addInput called."
         term = Node.addInput(self, 'input', renamable=True, removable=True, multiable=True)
         #print "Node.addInput returned. term:", term
-        item = QtGui.QTreeWidgetItem([term.name()])
+        item = QtWidgets.QTreeWidgetItem([term.name()])
         item.term = term
         term.joinItem = item
         #self.items.append((term, item))
@@ -350,7 +337,7 @@ class ColumnJoinNode(Node):
         self.tree.clear()
         for name in order:
             term = self[name]
-            item = QtGui.QTreeWidgetItem([name])
+            item = QtWidgets.QTreeWidgetItem([name])
             item.term = term
             term.joinItem = item
             #self.items.append((term, item))
