@@ -1,6 +1,6 @@
-from ...widgets.ColorButton import ColorButton
 from ... import functions as fn
-from .basetypes import WidgetParameterItem, SimpleParameter
+from ...widgets.ColorButton import ColorButton
+from .basetypes import SimpleParameter, WidgetParameterItem
 
 
 class ColorParameterItem(WidgetParameterItem):
@@ -23,7 +23,10 @@ class ColorParameter(SimpleParameter):
         return fn.mkColor(v)
 
     def value(self):
-        return fn.mkColor(super().value())
+        value = super().value()
+        if value is None:
+            return None
+        return fn.mkColor(value)
 
     def saveState(self, filter=None):
         state = super().saveState(filter)

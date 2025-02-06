@@ -1,13 +1,10 @@
-from ..Qt import QtCore, QtGui, QtWidgets, QT_LIB
 from .. import exporters as exporters
 from .. import functions as fn
-from ..graphicsItems.ViewBox import ViewBox
 from ..graphicsItems.PlotItem import PlotItem
+from ..graphicsItems.ViewBox import ViewBox
+from ..Qt import QtCore, QtWidgets
 
-import importlib
-ui_template = importlib.import_module(
-    f'.exportDialogTemplate_{QT_LIB.lower()}', package=__package__)
-
+from . import exportDialogTemplate_generic as ui_template
 
 class FormatExportListWidgetItem(QtWidgets.QListWidgetItem):
     def __init__(self, expClass, *args, **kwargs):
@@ -15,16 +12,16 @@ class FormatExportListWidgetItem(QtWidgets.QListWidgetItem):
         self.expClass = expClass
 
 
-class ExportDialog(QtGui.QWidget):
+class ExportDialog(QtWidgets.QWidget):
     def __init__(self, scene):
-        QtGui.QWidget.__init__(self)
+        QtWidgets.QWidget.__init__(self)
         self.setVisible(False)
         self.setWindowTitle("Export")
         self.shown = False
         self.currentExporter = None
         self.scene = scene
 
-        self.selectBox = QtGui.QGraphicsRectItem()
+        self.selectBox = QtWidgets.QGraphicsRectItem()
         self.selectBox.setPen(fn.mkPen('y', width=3, style=QtCore.Qt.PenStyle.DashLine))
         self.selectBox.hide()
         self.scene.addItem(self.selectBox)
@@ -52,15 +49,16 @@ class ExportDialog(QtGui.QWidget):
         self.activateWindow()
         self.raise_()
         self.selectBox.setVisible(True)
-        
         if not self.shown:
             self.shown = True
-            vcenter = self.scene.getViewWidget().geometry().center()
-            self.setGeometry(vcenter.x()-self.width()/2, vcenter.y()-self.height()/2, self.width(), self.height())
+            center = self.screen().availableGeometry().center()
+            frame = self.frameGeometry()
+            frame.moveCenter(center)
+            self.move(frame.topLeft())
         
     def updateItemList(self, select=None):
         self.ui.itemTree.clear()
-        si = QtGui.QTreeWidgetItem(["Entire Scene"])
+        si = QtWidgets.QTreeWidgetItem(["Entire Scene"])
         si.gitem = self.scene
         self.ui.itemTree.addTopLevelItem(si)
         self.ui.itemTree.setCurrentItem(si)
@@ -72,9 +70,9 @@ class ExportDialog(QtGui.QWidget):
     def updateItemTree(self, item, treeItem, select=None):
         si = None
         if isinstance(item, ViewBox):
-            si = QtGui.QTreeWidgetItem(['ViewBox'])
+            si = QtWidgets.QTreeWidgetItem(['ViewBox'])
         elif isinstance(item, PlotItem):
-            si = QtGui.QTreeWidgetItem(['Plot'])
+            si = QtWidgets.QTreeWidgetItem(['Plot'])
             
         if si is not None:
             si.gitem = item
@@ -87,6 +85,7 @@ class ExportDialog(QtGui.QWidget):
             self.updateItemTree(ch, treeItem, select=select)
         
             
+    @QtCore.Slot(QtWidgets.QTreeWidgetItem, QtWidgets.QTreeWidgetItem)
     def exportItemChanged(self, item, prev):
         if item is None:
             return
@@ -106,13 +105,14 @@ class ExportDialog(QtGui.QWidget):
         for exp in exporters.listExporters():
             item = FormatExportListWidgetItem(exp, QtCore.QCoreApplication.translate('Exporter', exp.Name))
             self.ui.formatList.addItem(item)
-            if item == current:
+            if item is current:
                 self.ui.formatList.setCurrentRow(self.ui.formatList.count() - 1)
                 gotCurrent = True
                 
         if not gotCurrent:
             self.ui.formatList.setCurrentRow(0)
         
+    @QtCore.Slot(QtWidgets.QListWidgetItem, QtWidgets.QListWidgetItem)
     def exportFormatChanged(self, item, prev):
         if item is None:
             self.currentExporter = None
@@ -130,10 +130,12 @@ class ExportDialog(QtGui.QWidget):
         self.currentExporter = exp
         self.ui.copyBtn.setEnabled(exp.allowCopy)
         
+    @QtCore.Slot()
     def exportClicked(self):
         self.selectBox.hide()
         self.currentExporter.export()
         
+    @QtCore.Slot()
     def copyClicked(self):
         self.selectBox.hide()
         self.currentExporter.export(copy=True)

@@ -1,6 +1,6 @@
-from ... Qt import QtCore, QtGui
 from ... import functions as fn
-from ... colormap import ColorMap
+from ...colormap import ColorMap
+from ...Qt import QtCore, QtGui
 from ..GLGraphicsItem import GLGraphicsItem
 
 __all__ = ['GLGradientLegendItem']
@@ -10,7 +10,7 @@ class GLGradientLegendItem(GLGraphicsItem):
     Displays legend colorbar on the screen.
     """
 
-    def __init__(self, **kwds):
+    def __init__(self, parentItem=None, **kwds):
         """
         Arguments:
             pos: position of the colorbar on the screen, from the top left corner, in pixels
@@ -24,7 +24,7 @@ class GLGradientLegendItem(GLGraphicsItem):
                 size as percentage
                 legend title
         """
-        GLGraphicsItem.__init__(self)
+        super().__init__(parentItem=parentItem)
         glopts = kwds.pop("glOptions", "additive")
         self.setGLOptions(glopts)
         self.pos = (10, 10)
@@ -80,4 +80,3 @@ class GLGradientLegendItem(GLGraphicsItem):
             ##todo: fonts
             painter.drawText(QtCore.QPointF(x, y), labelText)
         painter.end()
-

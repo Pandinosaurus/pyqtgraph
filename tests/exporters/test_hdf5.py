@@ -1,9 +1,10 @@
-# -*- coding: utf-8 -*-
+import numpy as np
 import pytest
+from numpy.testing import assert_equal
+
 import pyqtgraph as pg
 from pyqtgraph.exporters import HDF5Exporter
-import numpy as np
-from numpy.testing import assert_equal
+
 h5py = pytest.importorskip("h5py")
 
 
@@ -20,7 +21,8 @@ def test_HDF5Exporter(tmp_h5, combine):
     y1 = np.sin(x)
     y2 = np.cos(x)
 
-    plt = pg.plot()
+    plt = pg.PlotWidget()
+    plt.show()
     plt.plot(x=x, y=y1)
     plt.plot(x=x, y=y2)
 
@@ -50,7 +52,8 @@ def test_HDF5Exporter_unequal_lengths(tmp_h5):
     x2 = np.linspace(0, 1, 100)
     y2 = np.cos(x2)
 
-    plt = pg.plot()
+    plt = pg.PlotWidget()
+    plt.show()
     plt.plot(x=x1, y=y1, name='plot0')
     plt.plot(x=x2, y=y2)
 

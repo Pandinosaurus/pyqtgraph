@@ -1,7 +1,12 @@
-import os, sys, shutil, time
-import pyqtgraph as pg
-import pytest
+import os
+import platform
+import shutil
+import time
 
+import pytest
+from packaging.version import Version, parse
+
+import pyqtgraph as pg
 
 pgpath = os.path.join(os.path.dirname(pg.__file__), '..')
 pgpath_repr = repr(pgpath)
@@ -14,6 +19,8 @@ import pyqtgraph as pg
 
 class C(pg.QtCore.QObject):
     sig = pg.QtCore.Signal()
+    # https://www.riverbankcomputing.com/pipermail/pyqt/2024-August/045989.html
+    # @pg.QtCore.Slot()
     def fn(self):
         print("{msg}")
 
@@ -28,11 +35,14 @@ def remove_cache(mod):
 
 @pytest.mark.skipif(
     (
-        (pg.Qt.QT_LIB == "PySide2" and pg.Qt.QtVersion.startswith("5.15"))
-        or (pg.Qt.QT_LIB == "PySide6")
-    ) and (sys.version_info >= (3, 9)),
+        pg.Qt.QT_LIB.startswith("PySide") and
+        parse(pg.Qt.QtVersion) < Version('6.6.0') and # not sure when exactly fixed
+        platform != 'Darwin' # seems to work on macOS
+    ),
     reason="Unknown Issue"
 )
+# https://www.riverbankcomputing.com/pipermail/pyqt/2024-August/045989.html
+@pytest.mark.qt_log_ignore("Registering dynamic slot")
 @pytest.mark.usefixtures("tmp_module")
 def test_reload(tmp_module):
     # write a module
@@ -82,4 +92,3 @@ def test_reload(tmp_module):
     assert cfn2.__self__ is c
 
     pg.functions.disconnect(c.sig, c.fn)
-

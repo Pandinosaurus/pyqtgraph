@@ -1,11 +1,11 @@
 import builtins
 
-from ..ParameterItem import ParameterItem
-from ..Parameter import Parameter
-
 from ... import functions as fn
-from ...Qt import QtWidgets, QtCore, QtGui
 from ... import icons
+from ...Qt import QtCore, QtWidgets
+from ..Parameter import Parameter
+from ..ParameterItem import ParameterItem
+
 
 class WidgetParameterItem(ParameterItem):
     """
@@ -17,6 +17,7 @@ class WidgetParameterItem(ParameterItem):
 
     This class can be subclassed by overriding makeWidget() to provide a custom widget.
     """
+
     def __init__(self, param, depth):
         ParameterItem.__init__(self, param, depth)
 
@@ -107,10 +108,10 @@ class WidgetParameterItem(ParameterItem):
         if ev.type() == ev.Type.KeyPress:
             if ev.key() == QtCore.Qt.Key.Key_Tab:
                 self.focusNext(forward=True)
-                return True ## don't let anyone else see this event
+                return True  ## don't let anyone else see this event
             elif ev.key() == QtCore.Qt.Key.Key_Backtab:
                 self.focusNext(forward=False)
-                return True ## don't let anyone else see this event
+                return True  ## don't let anyone else see this event
 
         return False
 
@@ -147,11 +148,11 @@ class WidgetParameterItem(ParameterItem):
         self.updateDefaultBtn()
 
     def updateDefaultBtn(self):
-        ## enable/disable default btn
         self.defaultBtn.setEnabled(
-            not self.param.valueIsDefault() and self.param.opts['enabled'] and self.param.writable())
+            self.param.valueModifiedSinceResetToDefault()
+            and self.param.opts['enabled']
+            and self.param.writable())
 
-        # hide / show
         self.defaultBtn.setVisible(self.param.hasDefault() and not self.param.readonly())
 
     def updateDisplayLabel(self, value=None):
@@ -217,6 +218,7 @@ class WidgetParameterItem(ParameterItem):
 
     def defaultClicked(self):
         self.param.setToDefault()
+        self.updateDefaultBtn()
 
     def optsChanged(self, param, opts):
         """Called when any options are changed that are not
@@ -229,6 +231,12 @@ class WidgetParameterItem(ParameterItem):
 
         if 'readonly' in opts:
             self.updateDefaultBtn()
+
+            if opts['readonly']:
+                self.displayLabel.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+            else:
+                self.displayLabel.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.LinksAccessibleByMouse)
+
             if hasattr(self.widget, 'setReadOnly'):
                 self.widget.setReadOnly(opts['readonly'])
             else:
@@ -252,8 +260,8 @@ class SimpleParameter(Parameter):
     """
     Parameter representing a single value.
 
-    This parameter is backed by :class:`WidgetParameterItem` to represent the
-    following parameter names through various subclasses:
+    This parameter is backed by :class:`~pyqtgraph.parametertree.parameterTypes.basetypes.WidgetParameterItem`
+     to represent the following parameter names through various subclasses:
 
       - 'int'
       - 'float'
@@ -262,25 +270,31 @@ class SimpleParameter(Parameter):
       - 'color'
       - 'colormap'
     """
-    def __init__(self, *args, **kargs):
-        """
-        Initialize the parameter.
 
-        This is normally called implicitly through :meth:`Parameter.create`.
-        The keyword arguments avaialble to :meth:`Parameter.__init__` are
-        applicable.
-        """
-        Parameter.__init__(self, *args, **kargs)
+    @property
+    def itemClass(self):
+        from .bool import BoolParameterItem
+        from .numeric import NumericParameterItem
+        from .str import StrParameterItem
+        return {
+            'bool': BoolParameterItem,
+            'int': NumericParameterItem,
+            'float': NumericParameterItem,
+            'str': StrParameterItem,
+        }[self.opts['type']]
 
     def _interpretValue(self, v):
         typ = self.opts['type']
+
         def _missing_interp(v):
             # Assume raw interpretation
             return v
             # Or:
             # raise TypeError(f'No interpreter found for type {typ}')
+
         interpreter = getattr(builtins, typ, _missing_interp)
         return interpreter(v)
+
 
 class GroupParameterItem(ParameterItem):
     """
@@ -288,8 +302,10 @@ class GroupParameterItem(ParameterItem):
     of child parameters. It also provides a simple mechanism for displaying a button or combo
     that can be used to add new parameters to the group.
     """
+
     def __init__(self, param, depth):
         ParameterItem.__init__(self, param, depth)
+        self._initialFontPointSize = self.font(0).pointSize()
         self.updateDepth(depth)
 
         self.addItem = None
@@ -305,7 +321,7 @@ class GroupParameterItem(ParameterItem):
                 self.addWidget.clicked.connect(self.addClicked)
             w = QtWidgets.QWidget()
             l = QtWidgets.QHBoxLayout()
-            l.setContentsMargins(0,0,0,0)
+            l.setContentsMargins(0, 0, 0, 0)
             w.setLayout(l)
             l.addWidget(self.addWidget)
             l.addStretch()
@@ -318,25 +334,19 @@ class GroupParameterItem(ParameterItem):
 
         self.optsChanged(self.param, self.param.opts)
 
+    def pointSize(self):
+        return self._initialFontPointSize
+
     def updateDepth(self, depth):
-        ## Change item's appearance based on its depth in the tree
-        ## This allows highest-level groups to be displayed more prominently.
-        if depth == 0:
-            for c in [0,1]:
-                self.setBackground(c, QtGui.QBrush(QtGui.QColor(100,100,100)))
-                self.setForeground(c, QtGui.QBrush(QtGui.QColor(220,220,255)))
-                font = self.font(c)
-                font.setBold(True)
-                font.setPointSize(font.pointSize()+1)
-                self.setFont(c, font)
-        else:
-            for c in [0,1]:
-                self.setBackground(c, QtGui.QBrush(QtGui.QColor(220,220,220)))
-                self.setForeground(c, QtGui.QBrush(QtGui.QColor(50,50,50)))
-                font = self.font(c)
-                font.setBold(True)
-                #font.setPointSize(font.pointSize()+1)
-                self.setFont(c, font)
+        """
+        Change set the item font to bold and increase the font size on outermost groups.
+        """
+        for c in [0, 1]:
+            font = self.font(c)
+            font.setBold(True)
+            if depth == 0:
+                font.setPointSize(self.pointSize() + 1)
+            self.setFont(c, font)
         self.titleChanged()  # sets the size hint for column 0 which is based on the new font
 
     def addClicked(self):
@@ -367,7 +377,7 @@ class GroupParameterItem(ParameterItem):
 
     def addChild(self, child):  ## make sure added childs are actually inserted before add btn
         if self.addItem is not None:
-            ParameterItem.insertChild(self, self.childCount()-1, child)
+            ParameterItem.insertChild(self, self.childCount() - 1, child)
         else:
             ParameterItem.addChild(self, child)
 
@@ -421,6 +431,7 @@ class GroupParameter(Parameter):
     def setAddList(self, vals):
         """Change the list of options available for the user to add to the group."""
         self.setOpts(addList=vals)
+
 
 class Emitter(QtCore.QObject):
     """

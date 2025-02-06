@@ -1,27 +1,24 @@
-from OpenGL.GL import *
+from OpenGL.GL import *  # noqa
 from OpenGL import GL
-from ..Qt import QtCore
-from .. import Transform3D
 
+from .. import Transform3D
+from ..Qt import QtCore, QtGui
 
 GLOptions = {
     'opaque': {
         GL_DEPTH_TEST: True,
         GL_BLEND: False,
-        GL_ALPHA_TEST: False,
         GL_CULL_FACE: False,
     },
     'translucent': {
         GL_DEPTH_TEST: True,
         GL_BLEND: True,
-        GL_ALPHA_TEST: False,
         GL_CULL_FACE: False,
         'glBlendFunc': (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA),
     },
     'additive': {
         GL_DEPTH_TEST: False,
         GL_BLEND: True,
-        GL_ALPHA_TEST: False,
         GL_CULL_FACE: False,
         'glBlendFunc': (GL_SRC_ALPHA, GL_ONE),
     },
@@ -31,14 +28,14 @@ GLOptions = {
 class GLGraphicsItem(QtCore.QObject):
     _nextId = 0
     
-    def __init__(self, parentItem=None):
+    def __init__(self, parentItem: 'GLGraphicsItem' = None):
         super().__init__()
         self._id = GLGraphicsItem._nextId
         GLGraphicsItem._nextId += 1
         
-        self.__parent = None
+        self.__parent: GLGraphicsItem | None = None
         self.__view = None
-        self.__children = set()
+        self.__children: set[GLGraphicsItem] = set()
         self.__transform = Transform3D()
         self.__visible = True
         self.__initialized = False
@@ -135,9 +132,12 @@ class GLGraphicsItem(QtCore.QObject):
         
     def setTransform(self, tr):
         """Set the local transform for this object.
-        Must be a :class:`Transform3D <pyqtgraph.Transform3D>` instance. This transform
-        determines how the local coordinate system of the item is mapped to the coordinate
-        system of its parent."""
+
+        Parameters
+        ----------
+        tr : pyqtgraph.Transform3D
+            Tranformation from the local coordinate system to the parent's.
+        """
         self.__transform = Transform3D(tr)
         self.update()
         
@@ -301,6 +301,27 @@ class GLGraphicsItem(QtCore.QObject):
         if tr is None:
             return point
         return tr.inverted()[0].map(point)
-        
-        
-        
+
+    def modelViewMatrix(self) -> QtGui.QMatrix4x4:
+        topobj = self
+        while (view := topobj.view()) is None:
+            topobj = topobj.parentItem()
+            if topobj is None:
+                return QtGui.QMatrix4x4()
+        return view.currentModelView()
+
+    def projectionMatrix(self) -> QtGui.QMatrix4x4:
+        topobj = self
+        while (view := topobj.view()) is None:
+            topobj = topobj.parentItem()
+            if topobj is None:
+                return QtGui.QMatrix4x4()
+        return view.currentProjection()
+
+    def mvpMatrix(self) -> QtGui.QMatrix4x4:
+        topobj = self
+        while (view := topobj.view()) is None:
+            topobj = topobj.parentItem()
+            if topobj is None:
+                return QtGui.QMatrix4x4()
+        return view.currentProjection() * view.currentModelView()

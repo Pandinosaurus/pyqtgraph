@@ -1,15 +1,27 @@
-# -*- coding: utf-8 -*-
-from ..Qt import QtCore, QtGui
+from ..Qt import QtCore, QtGui, QtWidgets
 
-class CmdInput(QtGui.QLineEdit):
+
+class CmdInput(QtWidgets.QLineEdit):
     
     sigExecuteCmd = QtCore.Signal(object)
     
     def __init__(self, parent):
-        QtGui.QLineEdit.__init__(self, parent)
+        QtWidgets.QLineEdit.__init__(self, parent)
+        self.ps1 = ">>> "
+        self.ps2 = "... "
         self.history = [""]
         self.ptr = 0
+        font = QtGui.QFont("monospace")
+        font.setStyleHint(QtGui.QFont.StyleHint.TypeWriter, QtGui.QFont.StyleStrategy.PreferAntialias)
+        self.setFont(font)
+        self.setMultiline(False)
     
+    def setMultiline(self, ml):
+        if ml:
+            self.setPlaceholderText(self.ps2)
+        else:
+            self.setPlaceholderText(self.ps1)
+
     def keyPressEvent(self, ev):
         if ev.key() == QtCore.Qt.Key.Key_Up:
             if self.ptr < len(self.history) - 1:
@@ -21,7 +33,7 @@ class CmdInput(QtGui.QLineEdit):
                 self.setHistory(self.ptr-1)
                 ev.accept()
                 return
-        elif ev.key() == QtCore.Qt.Key.Key_Return:
+        elif ev.key() in (QtCore.Qt.Key.Key_Return, QtCore.Qt.Key.Key_Enter):
             self.execCmd()
         else:
             super().keyPressEvent(ev)

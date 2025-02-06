@@ -1,5 +1,6 @@
-from .basetypes import WidgetParameterItem
 from ...widgets.SpinBox import SpinBox
+from .basetypes import WidgetParameterItem
+
 
 class NumericParameterItem(WidgetParameterItem):
     """
@@ -26,7 +27,7 @@ class NumericParameterItem(WidgetParameterItem):
         for k in defs:
             if k in opts:
                 defs[k] = opts[k]
-        if 'limits' in opts:
+        if opts.get('limits') is not None:
             defs['min'], defs['max'] = opts['limits']
         w = SpinBox()
         w.setOpts(**defs)

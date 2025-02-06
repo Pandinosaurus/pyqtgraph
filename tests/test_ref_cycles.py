@@ -1,12 +1,14 @@
-# -*- coding: utf-8 -*-
 """
 Test for unwanted reference cycles
 
 """
-import pyqtgraph as pg
-import numpy as np
-import weakref
 import warnings
+import weakref
+
+import numpy as np
+
+import pyqtgraph as pg
+
 app = pg.mkQApp()
 
 def assert_alldead(refs):
@@ -46,22 +48,11 @@ def test_PlotWidget():
         app.focusChanged.connect(w.plotItem.vb.invertY)
         
         # return weakrefs to a bunch of objects that should die when the scope exits.
-        return mkrefs(w, c, data, w.plotItem, w.plotItem.vb, w.plotItem.getMenu(), w.plotItem.getAxis('left'))
+        return mkrefs(w, c, data, w.plotItem, w.plotItem.vb, w.plotItem.getAxis('left'))
     
     for _ in range(5):
         assert_alldead(mkobjs())
 
-def test_GraphicsWindow():
-    def mkobjs():
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            w = pg.GraphicsWindow()
-        p1 = w.addPlot()
-        v1 = w.addViewBox()
-        return mkrefs(w, p1, v1)
-    
-    for _ in range(5):
-        assert_alldead(mkobjs())
 
 def test_ImageView():
     def mkobjs():

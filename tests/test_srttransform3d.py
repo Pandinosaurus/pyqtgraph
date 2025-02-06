@@ -1,7 +1,9 @@
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtGui
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_almost_equal
+import pytest
+from numpy.testing import assert_almost_equal, assert_array_almost_equal
+
+import pyqtgraph as pg
+from pyqtgraph.Qt import QtCore, QtGui
 
 testPoints = np.array([
                        [0, 0, 0],
@@ -26,7 +28,7 @@ def testMatrix():
 
     tr2 = pg.Transform3D(tr)
     assert np.all(tr.matrix() == tr2.matrix())
-    
+
     # This is the most important test:
     # The transition from Transform3D to SRTTransform3D is a tricky one.
     tr3 = pg.SRTTransform3D(tr2)
@@ -37,3 +39,16 @@ def testMatrix():
     assert_array_almost_equal(tr3.getTranslation(), tr.getTranslation())
 
 
+@pytest.mark.parametrize("v", [
+    pg.Vector((0, 0, 0)),
+    QtGui.QVector3D(0, 0, 0),
+    np.array((0, 0, 0)),
+    QtCore.QPoint(0, 0),
+    QtCore.QPointF(0.0, 0.0),
+    (0, 0, 0),
+    [0, 0],
+])
+def testMapTypes(v):
+    tr = pg.SRTTransform3D()
+    res = tr.map(v)
+    assert isinstance(res, type(v))

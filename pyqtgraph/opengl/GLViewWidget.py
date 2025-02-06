@@ -1,38 +1,27 @@
-# -*- coding: utf-8 -*-
-from ..Qt import QtCore, QtGui, QtWidgets
-from OpenGL.GL import *
-import OpenGL.GL.framebufferobjects as glfbo
+from OpenGL.GL import *  # noqa
+import OpenGL.GL.framebufferobjects as glfbo  # noqa
+from math import cos, radians, sin, tan
+import warnings
+
 import numpy as np
+
 from .. import Vector
 from .. import functions as fn
 from .. import getConfigOption
-import warnings
-from math import cos, sin, tan, radians
-##Vector = QtGui.QVector3D
+from ..Qt import QtCore, QtGui, QtWidgets
 
-
-class GLViewWidget(QtWidgets.QOpenGLWidget):
-    
-    def __init__(self, parent=None, devicePixelRatio=None, rotationMethod='euler'):
-        """    
-        Basic widget for displaying 3D data
-          - Rotation/scale controls
-          - Axis/grid display
-          - Export options
+class GLViewMixin:
+    def __init__(self, *args, rotationMethod='euler', **kwargs):
+        """
+        Mixin class providing functionality for GLViewWidget
 
         ================ ==============================================================
         **Arguments:**
-        parent           (QObject, optional): Parent QObject. Defaults to None.
-        devicePixelRatio No longer in use. High-DPI displays should automatically
-                         detect the correct resolution.
-        rotationMethod   (str): Mechanimsm to drive the rotation method, options are 
+        rotationMethod   (str): Mechanism to drive the rotation method, options are
                          'euler' and 'quaternion'. Defaults to 'euler'.
         ================ ==============================================================
         """
-
-        QtWidgets.QOpenGLWidget.__init__(self, parent)
-        
-        self.setFocusPolicy(QtCore.Qt.FocusPolicy.ClickFocus)
+        super().__init__(*args, **kwargs)
 
         if rotationMethod not in ["euler", "quaternion"]:
             raise ValueError("Rotation method should be either 'euler' or 'quaternion'")
@@ -57,21 +46,9 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         self.keyTimer = QtCore.QTimer()
         self.keyTimer.timeout.connect(self.evalKeyState)
 
-    def _updateScreen(self, screen):
-        self._updatePixelRatio()
-        if screen is not None:
-            screen.physicalDotsPerInchChanged.connect(self._updatePixelRatio)
-            screen.logicalDotsPerInchChanged.connect(self._updatePixelRatio)
-    
-    def _updatePixelRatio(self):
-        event = QtGui.QResizeEvent(self.size(), self.size())
-        self.resizeEvent(event)
-    
-    def showEvent(self, event):
-        window = self.window().windowHandle()
-        window.screenChanged.connect(self._updateScreen)
-        self._updateScreen(window.screen())
-        
+        self._modelViewStack = []
+        self._projectionStack = []
+
     def deviceWidth(self):
         dpr = self.devicePixelRatioF()
         return int(self.width() * dpr)
@@ -125,10 +102,17 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         """
         ctx = self.context()
         fmt = ctx.format()
-        if ctx.isOpenGLES() or fmt.version() < (2, 0):
+        if ctx.isOpenGLES():
+            warnings.warn(
+                f"pyqtgraph.opengl is primarily tested against OpenGL Desktop"
+                f" but OpenGL {fmt.version()} ES detected",
+                RuntimeWarning,
+                stacklevel=2
+            )
+        if fmt.version() < (2, 0):
             verString = glGetString(GL_VERSION)
             raise RuntimeError(
-                "pyqtgraph.opengl: Requires >= OpenGL 2.0 (not ES); Found %s" % verString
+                "pyqtgraph.opengl: Requires >= OpenGL 2.0; Found %s" % verString
             )
 
         for item in self.items:
@@ -152,8 +136,8 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         
     def setProjection(self, region=None):
         m = self.projectionMatrix(region)
-        glMatrixMode(GL_PROJECTION)
-        glLoadMatrixf(m.data())
+        self._projectionStack.clear()
+        self._projectionStack.append(m)
 
     def projectionMatrix(self, region=None):
         if region is None:
@@ -180,8 +164,8 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         
     def setModelview(self):
         m = self.viewMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        glLoadMatrixf(m.data())
+        self._modelViewStack.clear()
+        self._modelViewStack.append(m)
         
     def viewMatrix(self):
         tr = QtGui.QMatrix4x4()
@@ -195,6 +179,12 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         center = self.opts['center']
         tr.translate(-center.x(), -center.y(), -center.z())
         return tr
+
+    def currentModelView(self):
+        return self._modelViewStack[-1]
+
+    def currentProjection(self):
+        return self._projectionStack[-1]
 
     def itemsAt(self, region=None):
         """
@@ -248,7 +238,6 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
                 continue
             if i is item:
                 try:
-                    glPushAttrib(GL_ALL_ATTRIB_BITS)
                     if useItemNames:
                         glLoadName(i._id)
                         self._itemNames[i._id] = i
@@ -257,21 +246,13 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
                     from .. import debug
                     debug.printExc()
                     print("Error while drawing item %s." % str(item))
-                    
-                finally:
-                    glPopAttrib()
             else:
-                glMatrixMode(GL_MODELVIEW)
-                glPushMatrix()
+                self._modelViewStack.append(self.currentModelView() * i.transform())
                 try:
-                    tr = i.transform()
-                    a = np.array(tr.copyDataTo()).reshape((4,4))
-                    glMultMatrixf(a.transpose())
                     self.drawItemTree(i, useItemNames=useItemNames)
                 finally:
-                    glMatrixMode(GL_MODELVIEW)
-                    glPopMatrix()
-            
+                    self._modelViewStack.pop()
+
     def setCameraPosition(self, pos=None, distance=None, elevation=None, azimuth=None, rotation=None):
         if rotation is not None:
             # Alternatively, we could define that rotation overrides elevation and azimuth
@@ -376,18 +357,7 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
         
         Distances are scaled roughly such that a value of 1.0 moves
         by one pixel on screen.
-        
-        Prior to version 0.11, *relative* was expected to be either True (x-aligned) or
-        False (global). These values are deprecated but still recognized.
         """
-        # for backward compatibility:
-        if isinstance(relative, bool):
-            warnings.warn(
-                "'relative' as a boolean is deprecated, and will not be recognized in 0.13. "
-                "Acceptable values are 'global', 'view', or 'view-upright'",
-                DeprecationWarning, stacklevel=2
-            )    
-        relative = {True: "view-upright", False: "global"}.get(relative, relative)
         if relative == 'global':
             self.opts['center'] += QtGui.QVector3D(dx, dy, dz)
         elif relative == 'view-upright':
@@ -443,13 +413,15 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
             dist = (pos-cam).length()
         xDist = dist * 2. * tan(0.5 * radians(self.opts['fov']))
         return xDist / self.width()
-        
+
     def mousePressEvent(self, ev):
         lpos = ev.position() if hasattr(ev, 'position') else ev.localPos()
         self.mousePos = lpos
-        
+
     def mouseMoveEvent(self, ev):
         lpos = ev.position() if hasattr(ev, 'position') else ev.localPos()
+        if not hasattr(self, 'mousePos'):
+            self.mousePos = lpos
         diff = lpos - self.mousePos
         self.mousePos = lpos
         
@@ -596,3 +568,24 @@ class GLViewWidget(QtWidgets.QOpenGLWidget):
                 glDeleteRenderbuffers(1, [depth_buf])
 
         return output
+
+
+class GLViewWidget(GLViewMixin, QtWidgets.QOpenGLWidget):
+    def __init__(self, *args, devicePixelRatio=None, **kwargs):
+        """
+        Basic widget for displaying 3D data
+          - Rotation/scale controls
+          - Axis/grid display
+          - Export options
+
+        ================ ==============================================================
+        **Arguments:**
+        parent           (QObject, optional): Parent QObject. Defaults to None.
+        devicePixelRatio No longer in use. High-DPI displays should automatically
+                         detect the correct resolution.
+        rotationMethod   (str): Mechanism to drive the rotation method, options are
+                         'euler' and 'quaternion'. Defaults to 'euler'.
+        ================ ==============================================================
+        """
+        super().__init__(*args, **kwargs)
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.ClickFocus)
